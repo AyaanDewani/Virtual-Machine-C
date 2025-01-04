@@ -1,0 +1,221 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <assert.h>
+#include <string.h>
+
+#define ARRAY_SIZE(xs) (sizeof(xs)/sizeof((xs)[0]))
+#define BM_STACK_CAPACITY 1024
+#define BM_PROGRAM_CAPACITY 1024
+
+typedef enum {
+    ERR_OK = 0, //everything is okay :)
+    ERR_STACK_OVERFLOW, 
+    ERR_STACK_UNDERFLOW, 
+    ERR_ILLEGAL_INST,
+    ERR_DIV_BY_ZERO, 
+    ERR_ILLEGAL_INST_ACCESS, 
+} Err; 
+
+const char *err_as_cstr(Err err) {
+    switch (err) {
+        case ERR_OK:
+            return "ERR_OK";
+        case ERR_STACK_OVERFLOW:
+            return "ERR_STACK_OVERFLOW"; 
+        case ERR_STACK_UNDERFLOW:
+            return "ERR_STACK_UNDERFLOW";  
+        case ERR_ILLEGAL_INST:
+            return "ERR_ILLEGAL_INST"; 
+        case ERR_DIV_BY_ZERO: 
+            return "ERR_DIV_BY_ZERO"; 
+        case ERR_ILLEGAL_INST_ACCESS:
+            return "ERR_ILLEGAL_INST_ACCESS"; 
+        default: 
+            assert(0 && "err_as_cstr: Unreachable"); 
+    }
+}
+
+typedef int64_t Word;  
+
+
+typedef enum {
+    INST_PUSH, 
+    INST_PLUS,
+    INST_MINUS,
+    INST_MULT,
+    INST_DIV, 
+    INST_JMP, //unconditional jmp for loops
+    INST_HALT, 
+} Inst_Type; 
+
+const char *inst_type_as_cstr(Inst_Type type){
+    switch(type){
+        case INST_PUSH: return "INST_PUSH"; 
+        case INST_PLUS: return "INST_PLUS"; 
+        case INST_MINUS: return "INST_MINUS"; 
+        case INST_MULT: return "INST_MULT"; 
+        case INST_DIV: return "INST_DIV"; 
+        case INST_JMP: return "INST_JMP"; 
+        case INST_HALT: return "INST_HALT"; 
+        default: assert(0 && "inst_type_as_cstr: Unreachable"); 
+    }
+}
+
+typedef struct {
+    Inst_Type type; 
+    Word operand; 
+} Inst;
+
+typedef struct {
+    Word stack[BM_STACK_CAPACITY]; 
+    size_t stack_size; 
+
+    Inst program[BM_PROGRAM_CAPACITY]; 
+    size_t program_size; 
+    Word ip; 
+
+    int halt; 
+} Bm; 
+
+
+#define MAKE_INST_PUSH(value) {.type = INST_PUSH, .operand = (value)}
+#define MAKE_INST_PLUS {.type = INST_PLUS }
+#define MAKE_INST_MINUS {.type = INST_MINUS }
+#define MAKE_INST_MULT {.type = INST_MULT }
+#define MAKE_INST_DIV {.type = INST_DIV }
+#define MAKE_INST_JMP(addr) {.type = INST_JMP, .operand = (addr)}
+#define MAKE_INST_HALT(addr) {.type = INST_HALT, .operand = (addr)}
+
+static inline Inst inst_plus(void){
+    return (Inst) {.type = INST_PLUS}; 
+}
+
+
+Err bm_execute_inst (Bm *bm){
+
+    if (bm -> ip < 0 || bm->ip >= bm->program_size) {
+        return ERR_ILLEGAL_INST_ACCESS; 
+    }
+
+    Inst inst = bm->program[bm->ip]; 
+
+    switch (inst.type) {
+    case INST_PUSH: 
+        if(bm->stack_size > BM_STACK_CAPACITY){
+            return ERR_STACK_OVERFLOW; 
+        }
+        bm->stack[bm->stack_size++] = inst.operand; //pushing on the stack
+        bm->ip += 1;
+        break; 
+    case INST_PLUS:
+        if (bm->stack_size < 2){
+            return ERR_STACK_UNDERFLOW; 
+        }
+        bm->stack[bm->stack_size-2] += bm->stack[bm->stack_size-1];
+        bm->stack_size -= 1; 
+        bm->ip += 1;
+        break; 
+
+    case INST_MINUS:
+        if (bm->stack_size < 2){
+            return ERR_STACK_UNDERFLOW; 
+        }
+        bm->stack[bm->stack_size-2] -= bm->stack[bm->stack_size-1];
+        bm->stack_size -= 1; 
+        bm->ip += 1;
+        break; 
+
+    case INST_MULT:
+        if (bm->stack_size < 2){
+            return ERR_STACK_UNDERFLOW; 
+        }
+        bm->stack[bm->stack_size-2] *= bm->stack[bm->stack_size-1];
+        bm->stack_size -= 1; 
+        bm->ip += 1;
+        break; 
+
+    case INST_DIV:
+        if (bm->stack_size < 2){
+            return ERR_STACK_UNDERFLOW; 
+        }
+
+        if (bm->stack[bm->stack_size-1] == 0){
+            return ERR_DIV_BY_ZERO; 
+        }
+
+        bm->stack[bm->stack_size-2] /= bm->stack[bm->stack_size-1];
+        bm->stack_size -= 1; 
+        bm->ip += 1;
+        break; 
+
+    case INST_JMP: 
+
+
+    default: 
+        return ERR_ILLEGAL_INST; 
+    }
+
+    return ERR_OK; 
+
+}
+
+void bm_dump_stack(FILE *stream, const Bm *bm){
+    fprintf(stream, "Stack:\n");
+    if (bm->stack_size > 0) {
+        for (size_t i = 0; i < bm->stack_size; ++i){
+            fprintf(stream, " %ld\n", bm->stack[i]); 
+        }
+    } else {
+        fprintf(stream, " [empty]\n"); 
+    }
+    
+}
+
+void bm_load_program_from_memory(Bm *bm, Inst *program, size_t program_size){
+    assert(program_size < BM_PROGRAM_CAPACITY); 
+    memcpy(bm->program, program, sizeof(program[0]) * program_size);
+    bm->program_size = program_size;  
+}
+
+Bm bm = {0}; 
+
+Inst program[] = {
+    MAKE_INST_PUSH(69), 
+    MAKE_INST_PUSH(420),
+    MAKE_INST_PLUS, 
+    MAKE_INST_PUSH(42),
+    MAKE_INST_MINUS,
+    MAKE_INST_PUSH(2),
+    MAKE_INST_MULT,
+    MAKE_INST_PUSH(4),
+    MAKE_INST_DIV, 
+};
+
+
+
+// void bm_push_inst(Bm *bm, Inst inst){
+
+//     assert(bm->program_size < BM_PROGRAM_CAPACITY); 
+//     bm->program[bm->program_size++] = inst; 
+// }
+
+
+
+int main(){
+
+    bm_load_program_from_memory(&bm, program, ARRAY_SIZE(program));     
+    bm_dump_stack(stdout, &bm); 
+    while (!bm.halt) {
+        // printf("%s\n", inst_type_as_cstr(program[bm.ip].type)); 
+        Err err = bm_execute_inst(&bm); 
+        bm_dump_stack(stdout, &bm); 
+        if (err != ERR_OK) {
+            fprintf(stderr, "Error activated: %s\n", err_as_cstr(err)); 
+            exit(1); 
+        }
+    }; 
+
+
+    return 0;
+}
