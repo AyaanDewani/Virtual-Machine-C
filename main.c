@@ -7,6 +7,7 @@
 #define ARRAY_SIZE(xs) (sizeof(xs)/sizeof((xs)[0]))
 #define BM_STACK_CAPACITY 1024
 #define BM_PROGRAM_CAPACITY 1024
+#define BM_EXECUTION_LIMIT 69
 
 typedef enum {
     ERR_OK = 0, //everything is okay :)
@@ -69,10 +70,10 @@ typedef struct {
 
 typedef struct {
     Word stack[BM_STACK_CAPACITY]; 
-    size_t stack_size; 
+    Word stack_size; 
 
     Inst program[BM_PROGRAM_CAPACITY]; 
-    size_t program_size; 
+    Word program_size; 
     Word ip; 
 
     int halt; 
@@ -150,7 +151,12 @@ Err bm_execute_inst (Bm *bm){
         break; 
 
     case INST_JMP: 
+        bm->ip = inst.operand; 
+        break;
 
+    case INST_HALT:
+        bm->halt = 1;
+        break; 
 
     default: 
         return ERR_ILLEGAL_INST; 
@@ -163,7 +169,7 @@ Err bm_execute_inst (Bm *bm){
 void bm_dump_stack(FILE *stream, const Bm *bm){
     fprintf(stream, "Stack:\n");
     if (bm->stack_size > 0) {
-        for (size_t i = 0; i < bm->stack_size; ++i){
+        for (Word i = 0; i < bm->stack_size; ++i){
             fprintf(stream, " %ld\n", bm->stack[i]); 
         }
     } else {
@@ -181,15 +187,19 @@ void bm_load_program_from_memory(Bm *bm, Inst *program, size_t program_size){
 Bm bm = {0}; 
 
 Inst program[] = {
-    MAKE_INST_PUSH(69), 
-    MAKE_INST_PUSH(420),
-    MAKE_INST_PLUS, 
-    MAKE_INST_PUSH(42),
-    MAKE_INST_MINUS,
-    MAKE_INST_PUSH(2),
-    MAKE_INST_MULT,
-    MAKE_INST_PUSH(4),
-    MAKE_INST_DIV, 
+    // MAKE_INST_PUSH(69), 
+    // MAKE_INST_PUSH(420),
+    // MAKE_INST_PLUS, 
+    // MAKE_INST_PUSH(42),
+    // MAKE_INST_MINUS,
+    // MAKE_INST_PUSH(2),
+    // MAKE_INST_MULT,
+    // MAKE_INST_PUSH(4),
+    // MAKE_INST_DIV,
+    MAKE_INST_PUSH(0), //0
+    MAKE_INST_PUSH(1), //1
+    MAKE_INST_PLUS, //2
+    MAKE_INST_JMP(1),  //3
 };
 
 
@@ -206,7 +216,7 @@ int main(){
 
     bm_load_program_from_memory(&bm, program, ARRAY_SIZE(program));     
     bm_dump_stack(stdout, &bm); 
-    while (!bm.halt) {
+    for (Word i = 0; i < BM_EXECUTION_LIMIT && !bm.halt; ++i) {
         // printf("%s\n", inst_type_as_cstr(program[bm.ip].type)); 
         Err err = bm_execute_inst(&bm); 
         bm_dump_stack(stdout, &bm); 
