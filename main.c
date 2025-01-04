@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <string.h>
+#include <errno.h>
 
 #define ARRAY_SIZE(xs) (sizeof(xs)/sizeof((xs)[0]))
 #define BM_STACK_CAPACITY 1024
@@ -246,27 +247,83 @@ void bm_load_program_from_memory(Bm *bm, Inst *program, size_t program_size){
     bm->program_size = program_size;  
 }
 
+void bm_load_program_from_file(Bm *bm, const char *file_path){
+    FILE *f = fopen(file_path, "rb"); 
+    if (f == NULL){
+        fprintf(stderr, "ERROR: Could not open file `%s` %s\n", file_path, strerror(errno));
+        exit(1); 
+    }
+
+    if (fseek(f, 0, SEEK_END) < 0){
+        fprintf(stderr, "ERROR: Could not read file `%s` %s\n", file_path, strerror(errno));
+        exit(1);   
+    }
+
+    long m = ftell(f);
+    if (m < 0){
+        fprintf(stderr, "ERROR: Could not read file `%s` %s\n", file_path, strerror(errno));
+        exit(1);   
+    } 
+
+    assert(m % sizeof(bm->program[0]) == 0);
+    assert((size_t)m <= BM_PROGRAM_CAPACITY * sizeof(bm->program[0])); 
+
+    if (fseek(f, 0, SEEK_SET) < 0){
+        fprintf(stderr, "ERROR: Could not read file `%s` %s\n", file_path, strerror(errno));
+        exit(1);           
+    }
+
+    bm->program_size = fread(bm->program, sizeof(bm->program[0]), m/sizeof(bm->program[0]), f); 
+    
+    if (ferror(f)){
+        fprintf(stderr, "ERROR: Could not read file `%s` %s\n", file_path, strerror(errno));
+        exit(1);          
+    }
+
+    fclose(f); 
+
+}
+
+void bm_save_program_to_file(Inst *program, size_t program_size, const char *file_path){
+    FILE *f = fopen(file_path, "wb"); 
+    if (f == NULL){
+        fprintf(stderr, "ERROR: Could not open file `%s` %s\n", file_path, strerror(errno));
+        exit(1); 
+    }
+
+    fwrite(program, sizeof(program[0]), program_size, f); 
+
+    if (ferror(f)){
+        fprintf(stderr, "ERROR: Could not write to file `%s` %s\n", file_path, strerror(errno));
+        exit(1);   
+    }
+
+    fclose(f); 
+
+
+}
+
 Bm bm = {0}; 
 
-Inst program[] = {
-    // MAKE_INST_PUSH(69), 
-    // MAKE_INST_PUSH(420),
-    // MAKE_INST_PLUS, 
-    // MAKE_INST_PUSH(42),
-    // MAKE_INST_MINUS,
-    // MAKE_INST_PUSH(2),
-    // MAKE_INST_MULT,
-    // MAKE_INST_PUSH(4),
-    // MAKE_INST_DIV,
-    MAKE_INST_PUSH(0), //0
-    MAKE_INST_PUSH(1), //1
-    MAKE_INST_DUP(1), //2
-    MAKE_INST_DUP(1), //3
-    MAKE_INST_PLUS,   //4
-    MAKE_INST_JMP(2), //5
+// Inst program[] = {
+//     // MAKE_INST_PUSH(69), 
+//     // MAKE_INST_PUSH(420),
+//     // MAKE_INST_PLUS, 
+//     // MAKE_INST_PUSH(42),
+//     // MAKE_INST_MINUS,
+//     // MAKE_INST_PUSH(2),
+//     // MAKE_INST_MULT,
+//     // MAKE_INST_PUSH(4),
+//     // MAKE_INST_DIV,
+//     MAKE_INST_PUSH(0), //0
+//     MAKE_INST_PUSH(1), //1
+//     MAKE_INST_DUP(1), //2
+//     MAKE_INST_DUP(1), //3
+//     MAKE_INST_PLUS,   //4
+//     MAKE_INST_JMP(2), //5
 
 
-};
+// };
 
 
 
@@ -277,10 +334,17 @@ Inst program[] = {
 // }
 
 
+// int main(void){
+//     bm_save_program_to_file(program, ARRAY_SIZE(program), "fib.bm");
+//     return 0; 
+// }
 
-int main(){
+int main(void){
 
-    bm_load_program_from_memory(&bm, program, ARRAY_SIZE(program));     
+    // bm_load_program_from_memory(&bm, program, ARRAY_SIZE(program));   
+    bm_load_program_from_file(&bm, "./fib.bm"); //works
+    //code in fib.bm -> last 6 line of the program array in this file 
+    //produces the same output (fibonacci sequence until F18)
     bm_dump_stack(stdout, &bm); 
     for (Word i = 0; i < 69 && !bm.halt; ++i) {
         // printf("%s\n", inst_type_as_cstr(program[bm.ip].type)); 
