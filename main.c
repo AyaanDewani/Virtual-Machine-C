@@ -16,6 +16,7 @@ typedef enum {
     ERR_ILLEGAL_INST,
     ERR_DIV_BY_ZERO, 
     ERR_ILLEGAL_INST_ACCESS, 
+    ERR_ILLEGAL_OPERAND, 
 } Err; 
 
 const char *err_as_cstr(Err err) {
@@ -31,7 +32,9 @@ const char *err_as_cstr(Err err) {
         case ERR_DIV_BY_ZERO: 
             return "ERR_DIV_BY_ZERO"; 
         case ERR_ILLEGAL_INST_ACCESS:
-            return "ERR_ILLEGAL_INST_ACCESS"; 
+            return "ERR_ILLEGAL_INST_ACCESS";
+        case ERR_ILLEGAL_OPERAND:
+            return "ERR_ILLEGAL_OPERAND";  
         default: 
             assert(0 && "err_as_cstr: Unreachable"); 
     }
@@ -42,12 +45,16 @@ typedef int64_t Word;
 
 typedef enum {
     INST_PUSH, 
+    INST_DUP, 
     INST_PLUS,
     INST_MINUS,
     INST_MULT,
     INST_DIV, 
     INST_JMP, //unconditional jmp for loops
+    INST_JMP_IF, 
+    INST_EQ, 
     INST_HALT, 
+    INST_PRINT_DEBUG,  
 } Inst_Type; 
 
 const char *inst_type_as_cstr(Inst_Type type){
@@ -59,6 +66,10 @@ const char *inst_type_as_cstr(Inst_Type type){
         case INST_DIV: return "INST_DIV"; 
         case INST_JMP: return "INST_JMP"; 
         case INST_HALT: return "INST_HALT"; 
+        case INST_JMP_IF: return "INST_JMP_IF"; 
+        case INST_EQ: return "INST_EQ"; 
+        case INST_PRINT_DEBUG: return "INST_PRINT_DEBUG"; 
+        case INST_DUP: return "INST_DUP"; 
         default: assert(0 && "inst_type_as_cstr: Unreachable"); 
     }
 }
@@ -87,6 +98,7 @@ typedef struct {
 #define MAKE_INST_DIV {.type = INST_DIV }
 #define MAKE_INST_JMP(addr) {.type = INST_JMP, .operand = (addr)}
 #define MAKE_INST_HALT(addr) {.type = INST_HALT, .operand = (addr)}
+#define MAKE_INST_DUP(addr) {.type = INST_DUP, .operand = (addr)}
 
 static inline Inst inst_plus(void){
     return (Inst) {.type = INST_PLUS}; 
@@ -158,6 +170,56 @@ Err bm_execute_inst (Bm *bm){
         bm->halt = 1;
         break; 
 
+    case INST_EQ:
+        if (bm->stack_size < 2){
+            return ERR_STACK_UNDERFLOW; 
+        }
+        bm->stack[bm->stack_size-2] = bm->stack[bm->stack_size-1] == bm->stack[bm->stack_size-2];
+        bm->stack_size -= 1; 
+        bm->ip += 1;   
+        break;      
+
+    case INST_JMP_IF:
+        if (bm->stack_size < 1){
+            return ERR_STACK_UNDERFLOW;
+        }
+
+        if (bm->stack[bm->stack_size - 1]) {
+            bm->stack_size -= 1;
+            bm->ip = inst.operand; 
+        } else {
+            bm->ip += 1; 
+        }
+        break; 
+
+    case INST_PRINT_DEBUG: 
+        if (bm->stack_size < 1){
+            return ERR_STACK_UNDERFLOW;
+        }
+
+        printf("%ld\n", bm->stack[bm->stack_size - 1]); 
+        bm->stack_size -= 1;
+        bm->ip += 1; 
+        break; 
+
+    case INST_DUP: 
+        // 0 1 2 3 
+        //        ^
+        if(bm->stack_size > BM_STACK_CAPACITY){
+            return ERR_STACK_OVERFLOW; 
+        }
+
+        if (bm->stack_size - inst.operand <= 0){
+            return ERR_STACK_UNDERFLOW; 
+        }   
+        if (inst.operand < 0){
+            return ERR_ILLEGAL_OPERAND;  
+        }
+        bm->stack[bm->stack_size] = bm->stack[bm->stack_size - 1 - inst.operand];
+        bm->stack_size += 1;
+        bm->ip += 1; 
+        break; 
+
     default: 
         return ERR_ILLEGAL_INST; 
     }
@@ -198,8 +260,12 @@ Inst program[] = {
     // MAKE_INST_DIV,
     MAKE_INST_PUSH(0), //0
     MAKE_INST_PUSH(1), //1
-    MAKE_INST_PLUS, //2
-    MAKE_INST_JMP(1),  //3
+    MAKE_INST_DUP(1), //2
+    MAKE_INST_DUP(1), //3
+    MAKE_INST_PLUS,   //4
+    MAKE_INST_JMP(2), //5
+
+
 };
 
 
@@ -216,15 +282,16 @@ int main(){
 
     bm_load_program_from_memory(&bm, program, ARRAY_SIZE(program));     
     bm_dump_stack(stdout, &bm); 
-    for (Word i = 0; i < BM_EXECUTION_LIMIT && !bm.halt; ++i) {
+    for (Word i = 0; i < 69 && !bm.halt; ++i) {
         // printf("%s\n", inst_type_as_cstr(program[bm.ip].type)); 
         Err err = bm_execute_inst(&bm); 
-        bm_dump_stack(stdout, &bm); 
         if (err != ERR_OK) {
             fprintf(stderr, "Error activated: %s\n", err_as_cstr(err)); 
             exit(1); 
         }
     }; 
+    
+    bm_dump_stack(stdout, &bm); 
 
 
     return 0;
