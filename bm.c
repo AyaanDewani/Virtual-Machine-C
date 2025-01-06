@@ -456,7 +456,7 @@ Inst bm_translate_line(String_View line) {
     }
     
     else {
-        fprintf(stderr, "ERROR: Unknown Instruction `%.*s` ", (int) inst_name.count, inst_name.data);
+        fprintf(stderr, "ERROR: Unknown Instruction `%.*s`\n", (int) inst_name.count, inst_name.data);
         exit(1);  
     }
 
@@ -469,7 +469,7 @@ size_t bm_translate_source(String_View source, Inst *program, size_t program_cap
         assert(program_size < program_capacity); 
         String_View line = sv_trim(sv_chop_by_delim(&source, '\n'));
         // printf("#%.*s#\n", (int)line.count, line.data); 
-        if (line.count > 0) { 
+        if (line.count > 0 && *line.data != '#') { //making sure to ignore comments
             program[program_size++] = bm_translate_line(line);  
         }
     } 
