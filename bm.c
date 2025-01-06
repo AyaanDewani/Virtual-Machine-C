@@ -1,3 +1,7 @@
+// #ifndef BM_H_
+// #define BM_H_
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -6,10 +10,10 @@
 #include <errno.h>
 #include <ctype.h>
 
+
 #define ARRAY_SIZE(xs) (sizeof(xs)/sizeof((xs)[0]))
 #define BM_STACK_CAPACITY 1024
 #define BM_PROGRAM_CAPACITY 1024
-#define BM_EXECUTION_LIMIT 69
 
 typedef enum {
     ERR_OK = 0, //everything is okay :)
@@ -20,6 +24,9 @@ typedef enum {
     ERR_ILLEGAL_INST_ACCESS, 
     ERR_ILLEGAL_OPERAND, 
 } Err; 
+
+// #endif
+// #ifdef BM_IMPLEMENTATION
 
 const char *err_as_cstr(Err err) {
     switch (err) {
@@ -53,7 +60,7 @@ typedef enum {
     INST_MINUS,
     INST_MULT,
     INST_DIV, 
-    INST_JMP, //unconditional jmp for loops
+    INST_JMP, 
     INST_JMP_IF, 
     INST_EQ, 
     INST_HALT, 
@@ -110,7 +117,7 @@ static inline Inst inst_plus(void){
 
 Err bm_execute_inst (Bm *bm){
 
-    if (bm -> ip < 0 >= bm->program_size) {
+    if (bm -> ip >= bm->program_size) {
         return ERR_ILLEGAL_INST_ACCESS; 
     }
 
@@ -236,6 +243,25 @@ Err bm_execute_inst (Bm *bm){
 
 }
 
+
+
+Err bm_execute_program(Bm *bm, int limit){
+
+    while(limit != 0 && !bm->halt){
+        Err err = bm_execute_inst(bm);
+        if (err != ERR_OK){
+            return err; 
+        }
+
+        if(limit > 0){
+            --limit; 
+        }
+    }
+
+    return ERR_OK; 
+}
+
+
 void bm_dump_stack(FILE *stream, const Bm *bm){
     fprintf(stream, "Stack:\n");
     if (bm->stack_size > 0) {
@@ -291,14 +317,14 @@ void bm_load_program_from_file(Bm *bm, const char *file_path){
 
 }
 
-void bm_save_program_to_file(Inst *program, size_t program_size, const char *file_path){
+void bm_save_program_to_file(const Bm *bm, const char *file_path){
     FILE *f = fopen(file_path, "wb"); 
     if (f == NULL){
         fprintf(stderr, "ERROR: Could not open file `%s` %s\n", file_path, strerror(errno));
         exit(1); 
     }
 
-    fwrite(program, sizeof(program[0]), program_size, f); 
+    fwrite(bm->program, sizeof(bm->program[0]), bm->program_size, f); 
 
     if (ferror(f)){
         fprintf(stderr, "ERROR: Could not write to file `%s` %s\n", file_path, strerror(errno));
@@ -310,7 +336,7 @@ void bm_save_program_to_file(Inst *program, size_t program_size, const char *fil
 
 }
 
-Bm bm = {0}; 
+// Bm bm = {0}; 
 
 // char *source_code = 
 //     "push 0\n" 
@@ -494,3 +520,5 @@ String_View slurp_file(const char *file_path){
         .data = buffer, 
     }; 
 }
+
+// #endif
