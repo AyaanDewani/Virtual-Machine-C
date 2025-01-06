@@ -110,7 +110,7 @@ static inline Inst inst_plus(void){
 
 Err bm_execute_inst (Bm *bm){
 
-    if (bm -> ip < 0 || bm->ip >= bm->program_size) {
+    if (bm -> ip < 0 >= bm->program_size) {
         return ERR_ILLEGAL_INST_ACCESS; 
     }
 
@@ -494,44 +494,3 @@ String_View slurp_file(const char *file_path){
         .data = buffer, 
     }; 
 }
-
-int main(int argc, char **argv){
-
-    if (argc < 3){
-        fprintf(stderr, "Usage: ./bm <input.ebasm> <output.bm>\n");
-        fprintf(stderr, "ERROR: Expected input and output"); 
-        exit(1); 
-    }
-
-    const char *input_file_path = argv[1];
-    const char *output_file_path = argv[2];
-
-    String_View source = slurp_file(input_file_path); 
-
-    bm.program_size = bm_translate_source(source, bm.program, BM_PROGRAM_CAPACITY);
-    bm_save_program_to_file(bm.program, bm.program_size, output_file_path);
-    return 0; 
-}
-
-int main2(void){
-
-    // bm_load_program_from_memory(&bm, program, ARRAY_SIZE(program));   
-    bm_load_program_from_file(&bm, "./fib.bm"); //works
-    //code in fib.bm -> last 6 line of the program array in this file 
-    //produces the same output (fibonacci sequence until F18)
-    bm_dump_stack(stdout, &bm); 
-    for (Word i = 0; i < 69 && !bm.halt; ++i) {
-        // printf("%s\n", inst_type_as_cstr(program[bm.ip].type)); 
-        Err err = bm_execute_inst(&bm); 
-        if (err != ERR_OK) {
-            fprintf(stderr, "Error activated: %s\n", err_as_cstr(err)); 
-            exit(1); 
-        }
-    }; 
-    
-    bm_dump_stack(stdout, &bm); 
-
-
-    return 0;
-}
-
