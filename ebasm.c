@@ -1,6 +1,7 @@
 #include "./bm.c"
 
-Bm bm = {0}; 
+Bm bm = {0};
+Label_Table lt = {0};  
 
 char *shift(int *argc, char ***argv){
     assert(*argc > 0);
@@ -34,7 +35,7 @@ int main(int argc, char **argv){
 
     String_View source = slurp_file(input_file_path); 
 
-    bm.program_size = bm_translate_source(source, bm.program, BM_PROGRAM_CAPACITY);
+    bm_translate_source(source, &bm, &lt);
     bm_save_program_to_file(&bm, output_file_path);
     return 0; 
 }

@@ -7,6 +7,9 @@
 #define ARRAY_SIZE(xs) (sizeof(xs)/sizeof((xs)[0]))
 #define BM_STACK_CAPACITY 1024
 #define BM_PROGRAM_CAPACITY 1024
+#define LABEL_CAPACITY 1024
+#define UNRESOLVED_JMPS_CAPACITY 1024
+
 
 typedef int64_t Word;
 
@@ -76,6 +79,23 @@ typedef struct {
     const char *data;
 } String_View;
 
+typedef struct {
+    String_View name; 
+    Word addr;
+} Label; 
+
+typedef struct {
+    Word addr;
+    String_View label; 
+} Unresolved_Jmp; 
+
+typedef struct {
+    Label labels[LABEL_CAPACITY]; 
+    size_t labels_size; 
+    Unresolved_Jmp unresolved_jmps[UNRESOLVED_JMPS_CAPACITY]; 
+    size_t unresolved_jmps_size; 
+} Label_Table; 
+
 String_View cstr_as_sv(const char *cstr);
 String_View sv_trim_left(String_View sv);
 String_View sv_trim_right(String_View sv);
@@ -84,8 +104,7 @@ String_View sv_chop_by_delim(String_View *sv, char delim);
 int sv_eq(String_View a, String_View b);
 int sv_to_int(String_View sv);
 
-Inst bm_translate_line(String_View line);
-size_t bm_translate_source(String_View source, Inst *program, size_t program_capacity);
+void bm_translate_source(String_View source, Bm *bm,  Label_Table *lt);
 String_View slurp_file(const char *file_path);
 
 #endif // BM_H_

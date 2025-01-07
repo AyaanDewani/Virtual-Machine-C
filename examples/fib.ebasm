@@ -1,6 +1,9 @@
+#first comment
 push 0
 push 1
+loop: 
 dup 1
-dup 1
+dup 1 #side comment
 plus
-jmp 2
+#last comment
+jmp loop
