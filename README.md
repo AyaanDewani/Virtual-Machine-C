@@ -6,6 +6,7 @@ Birtual Machine for [Ebisp]
 ```console
 $ make
 $ make examples
+$ ./ebasm ./examples/fib.ebasm ./examples/fib.bm
 $ ./bmi ./examples/fib.bm
 $ ./bmi -i ./examples/fib.bm -l 69
 ```
